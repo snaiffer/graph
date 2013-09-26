@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"io"
+	"html/template"
 	"fmt"
    "net/http"
 	"strconv"
@@ -37,6 +40,12 @@ var graph_dimen = 0
 
 var wg sync.WaitGroup
 
+type ViewGraph struct {
+	 Nodes []byte
+	 Edges []byte
+}
+
+var ViewG ViewGraph
 
 
 func calc_ColCount(text string) int {
@@ -56,9 +65,9 @@ func calc_ColCount(text string) int {
 						 rang = -1
 						 temp = ""
 						 col_count++
-						 if text[k] == '\n' {
-							  break
-						 }
+					}
+					if text[k] == '\n' {
+						 break
 					}
 			  } else {
 					if text[k] != 13 {
@@ -90,19 +99,23 @@ func treat_row(k int, i int) {
 		 temp := graph[i][k] + graph[k][j]
 		 if graph[i][j] > temp || graph[i][j] == -1 {
 			  graph[i][j] = temp
-	//		  fmt.Printf("graph[%d][%d] = %d \n ", i, j, temp)
 		 }
 	}
 	defer wg.Done()
 }
 
 func calcHandler(w http.ResponseWriter, r *http.Request) {
-
+	result = false
 	text := r.FormValue("intext")
+	pd.Input = []byte(text)
 
 	graph_dimen = calc_ColCount(text)
 	if graph_dimen > graph_MaxDimen {
 		 mes_onload = 2
+		 http.Redirect(w, r, "/graph/", http.StatusFound)
+		 return
+	}
+	if graph_dimen == 0 {
 		 http.Redirect(w, r, "/graph/", http.StatusFound)
 		 return
 	}
@@ -179,33 +192,171 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 	pd.Output = []byte(text)
 //
 
+//Generate paths for a graphic graph
+	text = ""
+	for i := 0; i < graph_dimen; i++ {
+		 text += "{ data: { id: '" + strconv.Itoa(i) + "', name: '" + strconv.Itoa(i) + "' } },"
+	}
+	text = text[:(len(text)-1)]
+	ViewG.Nodes = []byte(text)
+
+	text = ""
+	for i := 0; i < graph_dimen; i++ {
+		 for j := 0; j < graph_dimen; j++ {
+			  if graph[i][j] != 0 {
+					text += "{ data: { source: '" + strconv.Itoa(i) + "', target: '" + strconv.Itoa(j) + "' } },"
+			  }
+
+		 }
+	}
+	text = text[:(len(text)-1)]
+	ViewG.Edges = []byte(text)
+//
+
 	result = true
 	http.Redirect(w, r, "/graph/", http.StatusFound)
 }
 
-
 func graphHandler(w http.ResponseWriter, r *http.Request) {
-	 head := "<body>"
+		 // http.ServeFile(w, r, "5.html")
+
 	 if mes_onload != -1 {
-			head = "<head><script> function message() { alert(\" " + message[mes_onload] + " \"); } </script></head><body onload=\"message();\">"
+		  head := "<script> function message() { alert(\" " + message[mes_onload] + " \"); } </script></head><body onload=\"message();\">"
+
+		  fmt.Fprintf(w,
+				head +
+				"<h1>%s</h1>"+
+				"<h2>%s</h2>"+
+				"<form action=\"/calc/\" method=\"POST\">"+
+				"<textarea style=\"width: 150px; height: 150px;\" name=\"intext\">%s</textarea><br>"+
+				"<input type=\"submit\" value=\"Calculate\">"+
+				"</form>" +
+				"</body>", pd.Title, pd.InvitInput, pd.Input)
 
 			mes_onload = -1
+	 } else {
+
+		  if result {
+
+			  bottom := "<div style=\"height:700px;  width: 400px\" name=\"cy\" id=\"cy\"></div>" +
+				 "" +
+				 "<script>" +
+				 "$('#cy').cytoscape({" +
+				 "  style: cytoscape.stylesheet()" +
+				 "    .selector('node')" +
+				 "      .css({" +
+				 "        'content': 'data(name)'," +
+				 "        'text-valign': 'center'," +
+				 "        'color': 'white'," +
+				 "        'text-outline-width': 2," +
+				 "        'text-outline-color': '#888'," +
+				 "      })" +
+				 "    .selector('edge')" +
+				 "      .css({" +
+				 "        'target-arrow-shape': 'triangle'" +
+				 "      })" +
+				 "    .selector(':selected')" +
+				 "      .css({" +
+				 "        'background-color': 'black'," +
+				 "        'line-color': 'black'," +
+				 "        'target-arrow-color': 'black'," +
+				 "        'source-arrow-color': 'black'" +
+				 "      })" +
+				 "    .selector('.faded')" +
+				 "      .css({" +
+				 "        'opacity': 0.25," +
+				 "        'text-opacity': 0" +
+				 "      })," +
+				 "" +
+				 "  elements: {" +
+				 "    nodes: ["
+
+				 /*
+				 ViewG.Nodes = []byte("{ data: { id: 'j', name: 'Jerry' } }," +
+						"{ data: { id: 'e', name: 'Elaine' } }," +
+						"{ data: { id: 'k', name: 'Kramer' } }," +
+						"{ data: { id: 'g', name: 'George' } }," +
+						"{ data: { id: 'a', name: 'Alex' } } ")
+						*/
+				 bottom += string(ViewG.Nodes)
+
+				 bottom += "]," +
+				 "    edges: ["
+
+				 /*
+				 ViewG.Edges = []byte("{ data: { source: 'j', target: 'e' } }," +
+					 "{ data: { source: 'j', target: 'k' } }," +
+					 "{ data: { source: 'j', target: 'g' } }," +
+					 "{ data: { source: 'e', target: 'j' } }," +
+					 "{ data: { source: 'e', target: 'k' } }," +
+					 "{ data: { source: 'k', target: 'j' } }," +
+					 "{ data: { source: 'k', target: 'e' } }," +
+					 "{ data: { source: 'k', target: 'g' } }," +
+					 "{ data: { source: 'g', target: 'j' } }," +
+					 "{ data: { source: 'g', target: 'a' } }" )
+					 */
+				 bottom += string(ViewG.Edges)
+
+				 bottom += "]" +
+				 "  }," +
+				 "" +
+				 "  ready: function(){" +
+				 "    window.cy = this;" +
+				 "" +
+				 "    cy.elements().unselectify();" +
+				 "" +
+				 "    cy.on('tap', 'node', function(e){" +
+				 "      var node = e.cyTarget;" +
+				 "      var neighborhood = node.neighborhood().add(node);" +
+				 "" +
+				 "      cy.elements().addClass('faded');" +
+				 "      neighborhood.removeClass('faded');" +
+				 "    });" +
+				 "" +
+				 "    cy.on('tap', function(e){" +
+				 "      if( e.cyTarget === cy ){" +
+				 "        cy.elements().removeClass('faded');" +
+				 "      }" +
+				 "    });" +
+				 "  }" +
+				 "});" +
+				 "</script>" +
+				 "</body>" +
+				 "</html>"
+
+
+	  src, _ := os.Open("orig.html")
+	  dest, _ := os.Create("dest.html")
+	  io.Copy(dest, src)
+	  dest.WriteString("<body>" +
+		  "<h1>" + string(pd.Title) + "</h1>"+
+		  "<h2>" + string(pd.InvitInput) + "</h2>"+
+		  "<form action=\"/calc/\" method=\"POST\">"+
+		  "<textarea style=\"width: 150px; height: 150px;\" name=\"intext\">" + string(pd.Input) + "</textarea><br>"+
+		  "<input type=\"submit\" value=\"Calculate\">"+
+		  "</form>" +
+		  "<h2>" + string(pd.InvitOutput) + "</h2>"+
+		  "<textarea style=\"width: 150px; height: 150px;\" name=\"result\">" +
+		  string(pd.Output) +
+		  "</textarea>" +
+		  bottom)
+
+	 t, _ := template.ParseFiles("dest.html")
+	 t.Execute(w, nil)
+		  } else {
+				fmt.Fprintf(w,
+					 "<body>" +
+					 "<h1>%s</h1>"+
+					 "<h2>%s</h2>"+
+					 "<form action=\"/calc/\" method=\"POST\">"+
+					 "<textarea style=\"width: 150px; height: 150px;\" name=\"intext\"></textarea><br>"+
+					 "<input type=\"submit\" value=\"Calculate\">"+
+					 "</form>" +
+					 "</body>", pd.Title, pd.InvitInput)
+		  }
+
 	 }
 
-    fmt.Fprintf(w,
-		  head +
-		  "<h1>%s</h1>"+
-		  "<h2>%s</h2>"+
-        "<form action=\"/calc/\" method=\"POST\">"+
-        "<textarea style=\"width: 150px; height: 150px;\" name=\"intext\"></textarea><br>"+
-        "<input type=\"submit\" value=\"Calculate\">"+
-        "</form>" +
-		  "</body>", pd.Title, pd.InvitInput)
-
-	 if result {
-			fmt.Fprintf(w, "<h2>%s</h2>"+
-								"<textarea style=\"width: 150px; height: 150px;\" name=\"result\">%s</textarea>", pd.InvitOutput, pd.Output)
-	 }
 }
 
 
