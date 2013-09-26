@@ -1,0 +1,16 @@
+GoLang:
+	) A Tour of Go
+		http://tour.golang.org/
+	) Writing web application
+		http://golang.org/doc/articles/wiki/
+
+Libraries for drawing graphs:
+	) Cytoscape
+		 http://cytoscape.github.io/cytoscape.js/#top					--docs
+		 http://jsbin.com/aXagaBU/1/edit										--live code example
+		 https://github.com/cytoscape/cytoscape.js/wiki/Downloads	--downloads
+
+	) Other libraruies:
+	)) http://philogb.github.io/jit/docs.html
+	)) http://javascript.open-libraries.com/utilities/drawing/canviz-javascript-library/
+
