@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"io"
-	"html/template"
 	"fmt"
    "net/http"
 	"strconv"
@@ -271,30 +268,11 @@ func graphHandler(w http.ResponseWriter, r *http.Request) {
 				 "  elements: {" +
 				 "    nodes: ["
 
-				 /*
-				 ViewG.Nodes = []byte("{ data: { id: 'j', name: 'Jerry' } }," +
-						"{ data: { id: 'e', name: 'Elaine' } }," +
-						"{ data: { id: 'k', name: 'Kramer' } }," +
-						"{ data: { id: 'g', name: 'George' } }," +
-						"{ data: { id: 'a', name: 'Alex' } } ")
-						*/
 				 bottom += string(ViewG.Nodes)
 
 				 bottom += "]," +
 				 "    edges: ["
 
-				 /*
-				 ViewG.Edges = []byte("{ data: { source: 'j', target: 'e' } }," +
-					 "{ data: { source: 'j', target: 'k' } }," +
-					 "{ data: { source: 'j', target: 'g' } }," +
-					 "{ data: { source: 'e', target: 'j' } }," +
-					 "{ data: { source: 'e', target: 'k' } }," +
-					 "{ data: { source: 'k', target: 'j' } }," +
-					 "{ data: { source: 'k', target: 'e' } }," +
-					 "{ data: { source: 'k', target: 'g' } }," +
-					 "{ data: { source: 'g', target: 'j' } }," +
-					 "{ data: { source: 'g', target: 'a' } }" )
-					 */
 				 bottom += string(ViewG.Edges)
 
 				 bottom += "]" +
@@ -324,25 +302,24 @@ func graphHandler(w http.ResponseWriter, r *http.Request) {
 				 "</body>" +
 				 "</html>"
 
-
-	  src, _ := os.Open("orig.html")
-	  dest, _ := os.Create("dest.html")
-	  io.Copy(dest, src)
-	  dest.WriteString("<body>" +
-		  "<h1>" + string(pd.Title) + "</h1>"+
-		  "<h2>" + string(pd.InvitInput) + "</h2>"+
-		  "<form action=\"/calc/\" method=\"POST\">"+
-		  "<textarea style=\"width: 150px; height: 150px;\" name=\"intext\">" + string(pd.Input) + "</textarea><br>"+
-		  "<input type=\"submit\" value=\"Calculate\">"+
-		  "</form>" +
-		  "<h2>" + string(pd.InvitOutput) + "</h2>"+
-		  "<textarea style=\"width: 150px; height: 150px;\" name=\"result\">" +
-		  string(pd.Output) +
-		  "</textarea>" +
-		  bottom)
-
-	 t, _ := template.ParseFiles("dest.html")
-	 t.Execute(w, nil)
+		  fmt.Fprintf(w,
+				"<html>" +
+				"<head>" +
+				"<script src=\"http://localhost:8080/js/jquery.min.js\"></script>" +
+				"<script src=\"http://localhost:8080/js/cytoscape.min.js\"></script>" +
+				"</head>" +
+				 "<body>" +
+				"<h1>" + string(pd.Title) + "</h1>"+
+				"<h2>" + string(pd.InvitInput) + "</h2>"+
+				"<form action=\"/calc/\" method=\"POST\">"+
+				"<textarea style=\"width: 150px; height: 150px;\" name=\"intext\">" + string(pd.Input) + "</textarea><br>"+
+				"<input type=\"submit\" value=\"Calculate\">"+
+				"</form>" +
+				"<h2>" + string(pd.InvitOutput) + "</h2>"+
+				"<textarea style=\"width: 150px; height: 150px;\" name=\"result\">" +
+				string(pd.Output) +
+				"</textarea>" +
+				bottom)
 		  } else {
 				fmt.Fprintf(w,
 					 "<body>" +
@@ -361,7 +338,9 @@ func graphHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
-  http.HandleFunc("/graph/", graphHandler)
-  http.HandleFunc("/calc/", calcHandler)
-  http.ListenAndServe(":8080", nil)
+	 fmt.Println("Started")
+	 http.Handle("/", http.FileServer(http.Dir("web")))
+	 http.HandleFunc("/graph/", graphHandler)
+	 http.HandleFunc("/calc/", calcHandler)
+	 http.ListenAndServe(":8080", nil)
 }
